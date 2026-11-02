@@ -2,11 +2,13 @@
 
 #![deny(missing_docs)]
 
+pub mod connection;
 pub mod error;
 pub mod frame;
 pub mod packets;
 pub mod types;
 
+pub use connection::{NetworkConnection, NetworkEvent};
 pub use error::{ProtocolError, Result};
 pub use frame::{ConnectionState, FrameDecoder, RawPacket};
 pub use packets::*;
