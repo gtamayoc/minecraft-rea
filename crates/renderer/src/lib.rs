@@ -2,5 +2,12 @@
 
 #![deny(missing_docs)]
 
-/// Renderer placeholder.
-pub fn renderer_init() {}
+pub mod camera;
+pub mod mesher;
+pub mod shader;
+pub mod vertex;
+
+pub use camera::Camera;
+pub use mesher::{mesh_chunk, BlockFace};
+pub use shader::CHUNK_SHADER;
+pub use vertex::{BlockVertex, ChunkMesh};
