@@ -11,6 +11,7 @@ minecraft-world = { path = "../world" }
 minecraft-renderer = { path = "../renderer" }
 tokio.workspace = true
 bytes.workspace = true
+glam.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 tracing.workspace = true

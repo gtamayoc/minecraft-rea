@@ -125,6 +125,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "glam",
  "minecraft-protocol",
  "minecraft-renderer",
  "minecraft-world",
@@ -160,6 +161,7 @@ name = "minecraft-world"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "glam",
  "minecraft-protocol",
  "thiserror",
  "tracing",
