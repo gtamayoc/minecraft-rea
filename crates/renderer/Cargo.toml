@@ -1,0 +1,12 @@
+[package]
+name = "minecraft-renderer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+minecraft-world = { path = "../world" }
+thiserror.workspace = true
+glam.workspace = true
+tracing.workspace = true

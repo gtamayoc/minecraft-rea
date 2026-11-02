@@ -1,0 +1,17 @@
+[package]
+name = "minecraft-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+minecraft-protocol = { path = "../protocol" }
+minecraft-world = { path = "../world" }
+minecraft-renderer = { path = "../renderer" }
+tokio.workspace = true
+bytes.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
