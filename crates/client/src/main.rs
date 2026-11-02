@@ -4,7 +4,9 @@ use minecraft_protocol::{
     ClientPlayerPositionAndLookPacket, JoinGamePacket, NetworkConnection, NetworkEvent,
     PlayerPositionAndLookPacket, ServerChatMessagePacket, SpawnPositionPacket,
 };
+use minecraft_world::{decode_chunk_data, World};
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -34,6 +36,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     info!("Connected successfully! Listening for server packets...");
+    let world = Arc::new(Mutex::new(World::new()));
 
     while let Some(event) = event_rx.recv().await {
         match event {
@@ -78,6 +81,20 @@ async fn main() -> anyhow::Result<()> {
                             pos.x, pos.y, pos.z, pos.yaw, pos.pitch, true,
                         );
                         let _ = connection.send_packet(ack.to_raw_packet()).await;
+                    }
+                }
+                0x21 => {
+                    // S21 Chunk Data
+                    let mut payload = pkt.payload;
+                    if let Ok(chunk) = decode_chunk_data(&mut payload) {
+                        let mut w = world.lock().unwrap();
+                        w.insert_chunk(chunk);
+                        info!(
+                            "Loaded chunk at ({}, {}). Total active chunks: {}",
+                            w.get_chunk(0, 0).map_or(0, |c| c.x),
+                            w.get_chunk(0, 0).map_or(0, |c| c.z),
+                            w.loaded_chunk_count()
+                        );
                     }
                 }
                 _ => {}

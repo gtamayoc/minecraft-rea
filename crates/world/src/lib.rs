@@ -2,5 +2,12 @@
 
 #![deny(missing_docs)]
 
-/// World module placeholder.
-pub fn world_init() {}
+pub mod block;
+pub mod chunk;
+pub mod decoder;
+pub mod world;
+
+pub use block::BlockState;
+pub use chunk::{Chunk, ChunkSection};
+pub use decoder::decode_chunk_data;
+pub use world::World;
