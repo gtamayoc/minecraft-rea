@@ -1,10 +1,11 @@
 //! Vertex definitions and meshing data structures for chunk rendering.
 
+use bytemuck::{Pod, Zeroable};
 use glam::{Vec2, Vec3};
 
 /// A single 3D vertex for voxel rendering.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Pod, Zeroable)]
 pub struct BlockVertex {
     /// 3D position in world or chunk coordinates.
     pub position: [f32; 3],
@@ -17,6 +18,41 @@ pub struct BlockVertex {
 }
 
 impl BlockVertex {
+    /// Vertex buffer layout for WGPU pipeline.
+    pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<BlockVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                // position: vec3<f32>
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                // normal: vec3<f32>
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                // uv: vec2<f32>
+                wgpu::VertexAttribute {
+                    offset: (std::mem::size_of::<[f32; 3]>() * 2) as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                // light: f32
+                wgpu::VertexAttribute {
+                    offset: (std::mem::size_of::<[f32; 3]>() * 2 + std::mem::size_of::<[f32; 2]>())
+                        as wgpu::BufferAddress,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32,
+                },
+            ],
+        }
+    }
+
     /// Creates a new `BlockVertex`.
     pub const fn new(position: Vec3, normal: Vec3, uv: Vec2, light: f32) -> Self {
         Self {

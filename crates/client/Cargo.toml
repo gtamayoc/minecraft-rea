@@ -12,6 +12,9 @@ minecraft-renderer = { path = "../renderer" }
 tokio.workspace = true
 bytes.workspace = true
 glam.workspace = true
+winit.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 tracing.workspace = true

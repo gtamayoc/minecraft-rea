@@ -8,5 +8,9 @@ license.workspace = true
 [dependencies]
 minecraft-world = { path = "../world" }
 thiserror.workspace = true
+anyhow.workspace = true
 glam.workspace = true
+winit.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
 tracing.workspace = true

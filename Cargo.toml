@@ -27,6 +27,11 @@ bytes = "1.10"
 flate2 = "1.0"
 glam = "0.29"
 
+# Windowing & Graphics
+winit = "0.29"
+wgpu = "0.19"
+bytemuck = { version = "1.16", features = ["derive"] }
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
