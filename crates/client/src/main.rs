@@ -1,7 +1,9 @@
 //! Minecraft 1.8.9 Clean-Room Client binary entry point.
 
+pub mod embedded_server;
 pub mod physics;
 
+use embedded_server::EmbeddedServer;
 use glam::DVec3;
 use minecraft_protocol::{
     ClientPlayerPositionAndLookPacket, JoinGamePacket, NetworkConnection, NetworkEvent,
@@ -12,6 +14,7 @@ use physics::PhysicsEntity;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -26,21 +29,29 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Starting Minecraft Java 1.8.9 Clean-Room Client (Protocol 47)...");
 
-    let server_addr: SocketAddr = "127.0.0.1:25565".parse()?;
+    let default_server: SocketAddr = "127.0.0.1:25565".parse()?;
     let username = "RustPlayer";
 
-    let (event_tx, mut event_rx) = mpsc::channel(100);
-
-    let connection = match NetworkConnection::connect(server_addr, username, event_tx).await {
-        Ok(conn) => Arc::new(conn),
-        Err(e) => {
-            warn!("Could not connect to {server_addr}: {e}");
-            info!("Run a local Minecraft 1.8.9 server with online-mode=false on 127.0.0.1:25565 to test live!");
-            return Ok(());
+    // 1. Check if an external dedicated server is running locally
+    let mut target_addr = default_server;
+    let _embedded_guard = match TcpStream::connect(default_server).await {
+        Ok(_) => {
+            info!("External Minecraft server detected on {default_server}. Connecting to external server...");
+            None
+        }
+        Err(_) => {
+            info!("No external server detected on {default_server}. Launching integrated offline server automatically...");
+            let server = EmbeddedServer::start().await?;
+            target_addr = server.addr();
+            Some(server)
         }
     };
 
-    info!("Connected successfully! Listening for server packets...");
+    let (event_tx, mut event_rx) = mpsc::channel(100);
+
+    let connection = Arc::new(NetworkConnection::connect(target_addr, username, event_tx).await?);
+    info!("Connected successfully to {target_addr}! Game session active.");
+
     let world = Arc::new(Mutex::new(World::new()));
     let player = Arc::new(Mutex::new(PhysicsEntity::new(DVec3::new(0.0, 65.0, 0.0))));
 
