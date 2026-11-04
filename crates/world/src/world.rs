@@ -43,6 +43,11 @@ impl World {
         self.chunks.len()
     }
 
+    /// Returns an iterator over all loaded chunks in the world.
+    pub fn iter_chunks(&self) -> impl Iterator<Item = &Chunk> {
+        self.chunks.values()
+    }
+
     /// Queries the block state at global world coordinates (x, y, z).
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> BlockState {
         if !(0..=255).contains(&y) {

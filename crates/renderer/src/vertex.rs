@@ -15,6 +15,8 @@ pub struct BlockVertex {
     pub uv: [f32; 2],
     /// Vertex AO or lighting factor (0.0 to 1.0).
     pub light: f32,
+    /// Base RGB color of the block type.
+    pub color: [f32; 3],
 }
 
 impl BlockVertex {
@@ -49,17 +51,27 @@ impl BlockVertex {
                     shader_location: 3,
                     format: wgpu::VertexFormat::Float32,
                 },
+                // color: vec3<f32>
+                wgpu::VertexAttribute {
+                    offset: (std::mem::size_of::<[f32; 3]>() * 2
+                        + std::mem::size_of::<[f32; 2]>()
+                        + std::mem::size_of::<f32>())
+                        as wgpu::BufferAddress,
+                    shader_location: 4,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
             ],
         }
     }
 
     /// Creates a new `BlockVertex`.
-    pub const fn new(position: Vec3, normal: Vec3, uv: Vec2, light: f32) -> Self {
+    pub const fn new(position: Vec3, normal: Vec3, uv: Vec2, light: f32, color: [f32; 3]) -> Self {
         Self {
             position: [position.x, position.y, position.z],
             normal: [normal.x, normal.y, normal.z],
             uv: [uv.x, uv.y],
             light,
+            color,
         }
     }
 }

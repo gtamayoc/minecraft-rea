@@ -9,7 +9,7 @@ use minecraft_protocol::{
     ClientPlayerPositionAndLookPacket, JoinGamePacket, NetworkConnection, NetworkEvent,
     PlayerPositionAndLookPacket,
 };
-use minecraft_renderer::{mesh_chunk, Camera, ChunkMesh, RenderContext};
+use minecraft_renderer::{mesh_world, Camera, ChunkMesh, RenderContext};
 use minecraft_world::{decode_chunk_data, World};
 use physics::PhysicsEntity;
 use std::collections::HashSet;
@@ -178,6 +178,7 @@ fn main() -> anyhow::Result<()> {
         WindowBuilder::new()
             .with_title("Minecraft 1.8.9 (Rust Clean-Room Client)")
             .with_inner_size(PhysicalSize::new(1280, 720))
+            .with_visible(true)
             .build(&event_loop)?,
     );
 
@@ -244,9 +245,7 @@ fn main() -> anyhow::Result<()> {
                     let mut dirty = mesh_dirty.lock().unwrap();
                     if *dirty {
                         let w = world.lock().unwrap();
-                        if let Some(chunk) = w.get_chunk(0, 0) {
-                            current_mesh = mesh_chunk(chunk, &w);
-                        }
+                        current_mesh = mesh_world(&w);
                         *dirty = false;
                     }
 

@@ -10,6 +10,6 @@ pub mod vertex;
 
 pub use camera::Camera;
 pub use context::RenderContext;
-pub use mesher::{mesh_chunk, BlockFace};
+pub use mesher::{mesh_chunk, mesh_world, BlockFace};
 pub use shader::CHUNK_SHADER;
 pub use vertex::{BlockVertex, ChunkMesh};

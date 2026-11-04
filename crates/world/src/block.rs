@@ -60,6 +60,31 @@ impl BlockState {
             _ => true,
         }
     }
+
+    /// Returns a representative RGB color for this block (for clean shader rendering before texture atlas).
+    pub fn debug_color(self) -> [f32; 3] {
+        match self.id {
+            1 => [0.55, 0.55, 0.55],  // Stone (Gray)
+            2 => [0.35, 0.65, 0.25],  // Grass (Green)
+            3 => [0.50, 0.35, 0.20],  // Dirt (Brown)
+            4 => [0.45, 0.45, 0.45],  // Cobblestone
+            5 => [0.65, 0.50, 0.30],  // Planks (Wood)
+            7 => [0.20, 0.20, 0.20],  // Bedrock (Dark charcoal)
+            12 => [0.85, 0.82, 0.60], // Sand (Yellowish)
+            13 => [0.48, 0.48, 0.48], // Gravel
+            14 => [0.90, 0.80, 0.20], // Gold Ore
+            15 => [0.70, 0.55, 0.45], // Iron Ore
+            16 => [0.25, 0.25, 0.25], // Coal Ore
+            17 => [0.40, 0.30, 0.18], // Log
+            18 => [0.20, 0.50, 0.15], // Leaves
+            35 => [0.90, 0.90, 0.90], // Wool (White)
+            41 => [0.95, 0.85, 0.10], // Gold Block
+            42 => [0.85, 0.85, 0.85], // Iron Block
+            56 => [0.20, 0.80, 0.85], // Diamond Ore
+            57 => [0.30, 0.90, 0.95], // Diamond Block
+            _ => [0.60, 0.60, 0.60],  // Default neutral
+        }
+    }
 }
 
 #[cfg(test)]

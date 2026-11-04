@@ -66,9 +66,11 @@ impl PhysicsEntity {
             let sin_yaw = yaw_rad.sin();
             let cos_yaw = yaw_rad.cos();
 
-            // Transform input direction by player yaw rotation
+            // When yaw = 0 deg, forward moves along -Z (Minecraft convention).
+            // strafe_input (+D) moves along +X: (strafe * cos, -strafe * sin)
+            // forward_input (+W) moves along -Z: (-forward * sin, -forward * cos)
             let accel_x = move_vec.x * cos_yaw - move_vec.z * sin_yaw;
-            let accel_z = move_vec.z * cos_yaw + move_vec.x * sin_yaw;
+            let accel_z = -move_vec.z * cos_yaw - move_vec.x * sin_yaw;
 
             let accel = if self.on_ground {
                 constants::WALK_ACCELERATION
@@ -97,9 +99,11 @@ impl PhysicsEntity {
         self.velocity.x *= horizontal_drag;
         self.velocity.z *= horizontal_drag;
 
-        // Prevent micro-jitter when velocity is negligible
-        if self.velocity.length_squared() < 1e-8 {
+        // 6. Void boundary check: Respawn player if fallen below the void (Y < -20.0)
+        if self.position.y < -20.0 {
+            self.position = DVec3::new(0.5, 65.0, 0.5);
             self.velocity = DVec3::ZERO;
+            self.on_ground = false;
         }
     }
 

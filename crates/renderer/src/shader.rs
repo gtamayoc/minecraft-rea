@@ -14,6 +14,7 @@ struct VertexInput {
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
     @location(3) light: f32,
+    @location(4) color: vec3<f32>,
 };
 
 struct VertexOutput {
@@ -21,6 +22,7 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
     @location(1) light: f32,
     @location(2) normal: vec3<f32>,
+    @location(3) color: vec3<f32>,
 };
 
 @vertex
@@ -30,14 +32,14 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     out.uv = in.uv;
     out.light = in.light;
     out.normal = in.normal;
+    out.color = in.color;
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Base voxel dirt/stone color multiplied by light factor
-    let base_color = vec3<f32>(0.6, 0.6, 0.6);
-    let final_rgb = base_color * in.light;
+    // Block color multiplied by directional light factor
+    let final_rgb = in.color * in.light;
     return vec4<f32>(final_rgb, 1.0);
 }
 "#;

@@ -119,9 +119,13 @@ async fn handle_client(mut stream: tokio::net::TcpStream) {
                                     s08.put_u8(0); // absolute
                                     let _ = writer.write_all(&RawPacket::new(0x08, s08.freeze()).encode_uncompressed()).await;
 
-                                    // Send synthetic sample terrain chunk (S21) around spawn
-                                    let chunk_pkt = generate_sample_flat_chunk(0, 0);
-                                    let _ = writer.write_all(&chunk_pkt.encode_uncompressed()).await;
+                                    // Send synthetic sample terrain chunks (3x3 grid around spawn: -1..=1)
+                                    for cx in -1..=1 {
+                                        for cz in -1..=1 {
+                                            let chunk_pkt = generate_sample_flat_chunk(cx, cz);
+                                            let _ = writer.write_all(&chunk_pkt.encode_uncompressed()).await;
+                                        }
+                                    }
                                 }
                                 ConnectionState::Play if pkt.id == 0x00 => {
                                     // Client KeepAlive ACK received

@@ -119,13 +119,30 @@ pub fn mesh_chunk(chunk: &Chunk, world: &World) -> ChunkMesh {
     mesh
 }
 
+/// Meshes all loaded chunks in the `World` into a combined renderable `ChunkMesh`.
+pub fn mesh_world(world: &World) -> ChunkMesh {
+    let mut combined_mesh = ChunkMesh::new();
+
+    for chunk in world.iter_chunks() {
+        let chunk_mesh = mesh_chunk(chunk, world);
+        let base_idx = combined_mesh.vertices.len() as u32;
+
+        combined_mesh.vertices.extend(chunk_mesh.vertices);
+        combined_mesh
+            .indices
+            .extend(chunk_mesh.indices.into_iter().map(|idx| idx + base_idx));
+    }
+
+    combined_mesh
+}
+
 fn append_face_quad(
     mesh: &mut ChunkMesh,
     x: f32,
     y: f32,
     z: f32,
     face: BlockFace,
-    _block: BlockState,
+    block: BlockState,
 ) {
     let normal = face.normal();
     // Shading multiplier according to face normal
@@ -135,6 +152,7 @@ fn append_face_quad(
         BlockFace::East | BlockFace::West => 0.8,
         BlockFace::North | BlockFace::South => 0.6,
     };
+    let color = block.debug_color();
 
     let base_idx = mesh.vertices.len() as u32;
 
@@ -183,10 +201,14 @@ fn append_face_quad(
     let uv2 = Vec2::new(1.0, 0.0);
     let uv3 = Vec2::new(0.0, 0.0);
 
-    mesh.vertices.push(BlockVertex::new(v0, normal, uv0, light));
-    mesh.vertices.push(BlockVertex::new(v1, normal, uv1, light));
-    mesh.vertices.push(BlockVertex::new(v2, normal, uv2, light));
-    mesh.vertices.push(BlockVertex::new(v3, normal, uv3, light));
+    mesh.vertices
+        .push(BlockVertex::new(v0, normal, uv0, light, color));
+    mesh.vertices
+        .push(BlockVertex::new(v1, normal, uv1, light, color));
+    mesh.vertices
+        .push(BlockVertex::new(v2, normal, uv2, light, color));
+    mesh.vertices
+        .push(BlockVertex::new(v3, normal, uv3, light, color));
 
     // Two triangles for the quad (CCW winding)
     mesh.indices.extend_from_slice(&[
