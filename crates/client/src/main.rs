@@ -15,7 +15,7 @@ use physics::PhysicsEntity;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing::{info, warn, Level};
@@ -74,6 +74,9 @@ fn main() -> anyhow::Result<()> {
 
     let world = Arc::new(Mutex::new(World::new()));
     let player = Arc::new(Mutex::new(PhysicsEntity::new(DVec3::new(0.5, 65.0, 0.5))));
+    // Sensitivity constant for FPS mouse look (degrees per pixel of raw motion).
+    // Exposed here so it can be tuned without hunting for magic numbers.
+    const MOUSE_SENSITIVITY: f32 = 0.15;
     let pressed_keys = Arc::new(Mutex::new(HashSet::<KeyCode>::new()));
 
     // 2. Physics & Position reporting background task (20 TPS / 50ms)
@@ -186,9 +189,15 @@ fn main() -> anyhow::Result<()> {
     let mut camera = Camera::new(Vec3::new(0.5, 66.62, 0.5), 1280.0 / 720.0);
     let mut current_mesh = ChunkMesh::new();
 
-    // Lock cursor for FPS camera controls
+    // Lock cursor for FPS camera controls; track state to allow toggle with Escape.
     let _ = window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
     window.set_cursor_visible(false);
+    // true = cursor captured (FPS mode), false = cursor free (menu/debug mode).
+    let mut cursor_grabbed = true;
+
+    // FPS counter for diagnostics — logs to tracing every second.
+    let mut fps_frame_count: u32 = 0;
+    let mut fps_timer = Instant::now();
 
     event_loop.run(move |event, elwt| {
         elwt.set_control_flow(ControlFlow::Poll);
@@ -198,9 +207,12 @@ fn main() -> anyhow::Result<()> {
                 event: DeviceEvent::MouseMotion { delta: (dx, dy) },
                 ..
             } => {
-                let mut p = player.lock().unwrap();
-                p.yaw += dx as f32 * 0.15;
-                p.pitch = (p.pitch - dy as f32 * 0.15).clamp(-89.9, 89.9);
+                // Only rotate when cursor is captured (FPS mode active).
+                if cursor_grabbed {
+                    let mut p = player.lock().unwrap();
+                    p.yaw += dx as f32 * MOUSE_SENSITIVITY;
+                    p.pitch = (p.pitch - dy as f32 * MOUSE_SENSITIVITY).clamp(-89.9, 89.9);
+                }
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => elwt.exit(),
@@ -220,7 +232,19 @@ fn main() -> anyhow::Result<()> {
                     let mut keys = pressed_keys.lock().unwrap();
                     if state == ElementState::Pressed {
                         if key_code == KeyCode::Escape {
-                            elwt.exit();
+                            // Toggle cursor capture: Escape releases/re-captures the cursor.
+                            // This matches vanilla Minecraft behaviour (Esc opens the pause menu
+                            // and releases mouse; clicking the window re-captures it).
+                            cursor_grabbed = !cursor_grabbed;
+                            if cursor_grabbed {
+                                let _ = window
+                                    .set_cursor_grab(winit::window::CursorGrabMode::Confined);
+                                window.set_cursor_visible(false);
+                            } else {
+                                let _ =
+                                    window.set_cursor_grab(winit::window::CursorGrabMode::None);
+                                window.set_cursor_visible(true);
+                            }
                         }
                         keys.insert(key_code);
                     } else {
@@ -255,6 +279,16 @@ fn main() -> anyhow::Result<()> {
                             wgpu::SurfaceError::OutOfMemory => elwt.exit(),
                             _ => {}
                         }
+                    }
+
+                    // FPS diagnostic counter: logs the measured frame rate every second.
+                    fps_frame_count += 1;
+                    let elapsed = fps_timer.elapsed();
+                    if elapsed >= Duration::from_secs(1) {
+                        let fps = fps_frame_count as f64 / elapsed.as_secs_f64();
+                        info!("FPS: {fps:.0}");
+                        fps_frame_count = 0;
+                        fps_timer = Instant::now();
                     }
                 }
                 _ => {}

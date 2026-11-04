@@ -66,11 +66,22 @@ impl PhysicsEntity {
             let sin_yaw = yaw_rad.sin();
             let cos_yaw = yaw_rad.cos();
 
-            // When yaw = 0 deg, forward moves along -Z (Minecraft convention).
-            // strafe_input (+D) moves along +X: (strafe * cos, -strafe * sin)
-            // forward_input (+W) moves along -Z: (-forward * sin, -forward * cos)
-            let accel_x = move_vec.x * cos_yaw - move_vec.z * sin_yaw;
-            let accel_z = -move_vec.z * cos_yaw - move_vec.x * sin_yaw;
+            // When forward_input = +1 (W), we want the player to move in the exact direction the camera looks.
+            // Camera yaw = p.yaw - 90 deg.
+            // cam.forward() on XZ:
+            //   cam_yaw = yaw - 90 deg
+            //   fwd_x = cos(yaw - 90 deg) = sin(yaw)
+            //   fwd_z = sin(yaw - 90 deg) = -cos(yaw)
+            //
+            // Right vector (strafe +1 / D):
+            //   right_x = cos(yaw)
+            //   right_z = sin(yaw)
+            //
+            // Therefore:
+            //   accel_x = forward_input * sin(yaw) + strafe_input * cos(yaw)
+            //   accel_z = forward_input * (-cos(yaw)) + strafe_input * sin(yaw)
+            let accel_x = move_vec.z * sin_yaw + move_vec.x * cos_yaw;
+            let accel_z = -move_vec.z * cos_yaw + move_vec.x * sin_yaw;
 
             let accel = if self.on_ground {
                 constants::WALK_ACCELERATION
@@ -218,5 +229,71 @@ mod tests {
         // Player feet should rest exactly on top of Y = 60 (y = 61.0)
         assert!((player.position.y - 61.0).abs() < 1e-3);
         assert!(player.on_ground);
+    }
+
+    /// US-018: forward_direction_matches_yaw_and_camera_view
+    ///
+    /// Verifies that when moving forward (W key / forward_input=1), the physics
+    /// velocity direction on the XZ plane exactly matches the camera forward direction.
+    /// Camera forward at p.yaw has camera.yaw = p.yaw - 90°.
+    /// For camera.yaw = -90° (p.yaw = 0°), camera.forward() is (0, 0, -1).
+    /// Therefore, moving forward with W must produce negative Z velocity.
+    #[test]
+    fn forward_direction_matches_camera_forward() {
+        let world = World::new();
+
+        for yaw_deg in [0.0f32, 45.0, 90.0, 180.0, 270.0] {
+            let mut p = PhysicsEntity::new(DVec3::new(0.5, 100.0, 0.5));
+            p.yaw = yaw_deg;
+            p.tick(&world, 1.0, 0.0, false);
+
+            let cam_yaw_rad = (yaw_deg - 90.0f32).to_radians();
+            let cam_fwd_x = cam_yaw_rad.cos() as f64;
+            let cam_fwd_z = cam_yaw_rad.sin() as f64;
+
+            let vel_norm = DVec3::new(p.velocity.x, 0.0, p.velocity.z).normalize();
+            let cam_norm = DVec3::new(cam_fwd_x, 0.0, cam_fwd_z).normalize();
+
+            let dot = vel_norm.dot(cam_norm);
+            assert!(
+                dot > 0.999,
+                "Movement direction does not match camera forward! at yaw={}, dot={}, vel={:?}, cam={:?}",
+                yaw_deg,
+                dot,
+                vel_norm,
+                cam_norm
+            );
+        }
+    }
+
+    /// US-018: backward_direction_opposes_forward
+    ///
+    /// S key (forward_input = -1) must produce exactly opposite velocity to W.
+    #[test]
+    fn backward_direction_opposes_forward() {
+        let world = World::new();
+        let test_yaw = 37.0_f32; // arbitrary non-cardinal angle
+
+        let mut fwd = PhysicsEntity::new(DVec3::new(0.5, 100.0, 0.5));
+        fwd.yaw = test_yaw;
+        fwd.tick(&world, 1.0, 0.0, false);
+
+        let mut bwd = PhysicsEntity::new(DVec3::new(0.5, 100.0, 0.5));
+        bwd.yaw = test_yaw;
+        bwd.tick(&world, -1.0, 0.0, false);
+
+        // Horizontal velocity components must be exact opposites
+        assert!(
+            (fwd.velocity.x + bwd.velocity.x).abs() < 1e-10,
+            "x components must be symmetric: fwd={} bwd={}",
+            fwd.velocity.x,
+            bwd.velocity.x
+        );
+        assert!(
+            (fwd.velocity.z + bwd.velocity.z).abs() < 1e-10,
+            "z components must be symmetric: fwd={} bwd={}",
+            fwd.velocity.z,
+            bwd.velocity.z
+        );
     }
 }

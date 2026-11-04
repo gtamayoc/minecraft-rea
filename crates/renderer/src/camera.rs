@@ -112,4 +112,60 @@ mod tests {
         let vp = cam.view_projection_matrix();
         assert!(!vp.is_nan());
     }
+
+    /// US-019: pitch_clamped_between_minus89_and_plus89
+    ///
+    /// Mouse delta that would push pitch beyond ±89° must be clamped.
+    #[test]
+    fn pitch_clamped_between_minus89_and_plus89() {
+        let mut cam = Camera::default();
+        // Large downward drag (dy > 0 → pitch decreases in rotate())
+        cam.rotate(0.0, 10_000.0, 0.15);
+        assert!(
+            cam.pitch >= -89.9,
+            "pitch must be clamped >= -89.9, got {}",
+            cam.pitch
+        );
+
+        let mut cam2 = Camera::default();
+        cam2.rotate(0.0, -10_000.0, 0.15);
+        assert!(
+            cam2.pitch <= 89.9,
+            "pitch must be clamped <= 89.9, got {}",
+            cam2.pitch
+        );
+    }
+
+    /// US-019: yaw_increases_with_positive_dx
+    ///
+    /// Moving the mouse right (dx > 0) must increase the yaw angle.
+    #[test]
+    fn yaw_increases_with_positive_dx() {
+        let mut cam = Camera::default();
+        let initial_yaw = cam.yaw;
+        cam.rotate(1.0, 0.0, 0.15);
+        assert!(
+            cam.yaw > initial_yaw,
+            "positive dx must increase yaw: initial={} final={}",
+            initial_yaw,
+            cam.yaw
+        );
+    }
+
+    /// US-019: forward_vector_is_never_nan_at_extreme_pitch
+    ///
+    /// At ±89° pitch the forward vector must be finite (no gimbal lock NaN).
+    #[test]
+    fn forward_vector_is_never_nan_at_extreme_pitch() {
+        for pitch in [-89.9f32, 0.0, 89.9] {
+            let mut cam = Camera::default();
+            cam.pitch = pitch;
+            let fwd = cam.forward();
+            assert!(
+                !fwd.is_nan(),
+                "forward() must not be NaN at pitch={}",
+                pitch
+            );
+        }
+    }
 }

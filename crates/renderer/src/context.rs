@@ -27,6 +27,16 @@ pub struct RenderContext {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     depth_texture_view: wgpu::TextureView,
+    /// Persistent GPU vertex buffer; reallocated only when the mesh grows.
+    vertex_buffer: Option<wgpu::Buffer>,
+    /// Persistent GPU index buffer; reallocated only when the mesh grows.
+    index_buffer: Option<wgpu::Buffer>,
+    /// Number of indices currently stored in `index_buffer`.
+    index_count: u32,
+    /// Capacity of `vertex_buffer` in bytes (to detect growth).
+    vertex_buf_cap: u64,
+    /// Capacity of `index_buffer` in bytes.
+    index_buf_cap: u64,
 }
 
 impl RenderContext {
@@ -74,7 +84,9 @@ impl RenderContext {
             format: surface_format,
             width: size.width.max(1),
             height: size.height.max(1),
-            present_mode: wgpu::PresentMode::AutoVsync,
+            // AutoNoVsync: prefer Immediate/Mailbox to allow > 60 FPS.
+            // Falls back to Fifo only if the driver/surface has no other option.
+            present_mode: wgpu::PresentMode::AutoNoVsync,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -183,6 +195,11 @@ impl RenderContext {
             camera_buffer,
             camera_bind_group,
             depth_texture_view,
+            vertex_buffer: None,
+            index_buffer: None,
+            index_count: 0,
+            vertex_buf_cap: 0,
+            index_buf_cap: 0,
         })
     }
 
@@ -231,37 +248,51 @@ impl RenderContext {
     }
 
     /// Renders a chunk mesh to the window surface.
+    ///
+    /// GPU buffers are reused across frames and only reallocated when the mesh grows,
+    /// eliminating a large per-frame allocation on the GPU allocator.
     pub fn render(&mut self, mesh: &ChunkMesh) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let vertex_buf = if !mesh.is_empty() {
-            Some(
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Vertex Buffer"),
-                        contents: bytemuck::cast_slice(&mesh.vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    }),
-            )
-        } else {
-            None
-        };
+        // Update persistent GPU buffers only when the mesh has geometry.
+        if !mesh.is_empty() {
+            let v_bytes: &[u8] = bytemuck::cast_slice(&mesh.vertices);
+            let i_bytes: &[u8] = bytemuck::cast_slice(&mesh.indices);
 
-        let index_buf = if !mesh.is_empty() {
-            Some(
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            // Reallocate vertex buffer if capacity is insufficient.
+            if v_bytes.len() as u64 > self.vertex_buf_cap {
+                self.vertex_buffer = Some(self.device.create_buffer_init(
+                    &wgpu::util::BufferInitDescriptor {
+                        label: Some("Vertex Buffer"),
+                        contents: v_bytes,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    },
+                ));
+                self.vertex_buf_cap = v_bytes.len() as u64;
+            } else if let Some(buf) = &self.vertex_buffer {
+                // Buffer is large enough — upload in-place with no allocation.
+                self.queue.write_buffer(buf, 0, v_bytes);
+            }
+
+            // Reallocate index buffer if capacity is insufficient.
+            if i_bytes.len() as u64 > self.index_buf_cap {
+                self.index_buffer = Some(self.device.create_buffer_init(
+                    &wgpu::util::BufferInitDescriptor {
                         label: Some("Index Buffer"),
-                        contents: bytemuck::cast_slice(&mesh.indices),
-                        usage: wgpu::BufferUsages::INDEX,
-                    }),
-            )
-        } else {
-            None
-        };
+                        contents: i_bytes,
+                        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                    },
+                ));
+                self.index_buf_cap = i_bytes.len() as u64;
+            } else if let Some(buf) = &self.index_buffer {
+                self.queue.write_buffer(buf, 0, i_bytes);
+            }
+
+            self.index_count = mesh.indices.len() as u32;
+        }
 
         let mut encoder = self
             .device
@@ -276,7 +307,7 @@ impl RenderContext {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        // Minecraft Sky blue color
+                        // Minecraft sky-blue background colour.
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.47,
                             g: 0.65,
@@ -298,12 +329,14 @@ impl RenderContext {
                 occlusion_query_set: None,
             });
 
-            if let (Some(v_buf), Some(i_buf)) = (&vertex_buf, &index_buf) {
-                render_pass.set_pipeline(&self.render_pipeline);
-                render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, v_buf.slice(..));
-                render_pass.set_index_buffer(i_buf.slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
+            if let (Some(v_buf), Some(i_buf)) = (&self.vertex_buffer, &self.index_buffer) {
+                if self.index_count > 0 {
+                    render_pass.set_pipeline(&self.render_pipeline);
+                    render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, v_buf.slice(..));
+                    render_pass.set_index_buffer(i_buf.slice(..), wgpu::IndexFormat::Uint32);
+                    render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+                }
             }
         }
 
